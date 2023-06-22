@@ -150,6 +150,7 @@
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
+#include <deque>
 #include <sys/types.h>
 #include <string>
 #include <fstream>
@@ -1072,7 +1073,7 @@ static bool rawmode = false; /* For atexit() function to check if restore is nee
 static bool mlmode = false;  /* Multi line mode. Default is single line. */
 static bool atexit_registered = false; /* Register atexit just 1 time. */
 static size_t history_max_len = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
-static std::vector<std::string> history;
+static std::deque<std::string> history;
 
 /* The linenoiseState structure represents the state during line editing.
  * We pass this state to functions implementing specific editing
@@ -1115,6 +1116,7 @@ enum KEY_ACTION {
 
 void linenoiseAtExit(void);
 bool AddHistory(const char *line);
+bool AddHistory(std::string line);
 void refreshLine(struct linenoiseState *l);
 
 /* ============================ UTF8 utilities ============================== */
@@ -2338,24 +2340,22 @@ inline void linenoiseAtExit(void) {
     disableRawMode(STDIN_FILENO);
 }
 
-/* This is the API call to add a new entry in the linenoise history.
- * It uses a fixed array of char pointers that are shifted (memmoved)
- * when the history max length is reached in order to remove the older
- * entry and make room for the new one, so it is not exactly suitable for huge
- * histories, but will work well for a few hundred of entries.
- *
- * Using a circular buffer is smarter, but a bit more complex to handle. */
-inline bool AddHistory(const char* line) {
+/* This is the API call to add a new entry in the linenoise history. */
+inline bool AddHistory(const char *line) {
+    return AddHistory(std::string(line));
+}
+
+inline bool AddHistory(std::string line) {
     if (history_max_len == 0) return false;
 
     /* Don't add duplicated lines. */
-    if (!history.empty() && history.back() == line) return false;
+if (!history.empty() && history.back() == line) return false;
 
-    /* If we reached the max length, remove the older line. */
-    if (history.size() == history_max_len) {
-        history.erase(history.begin());
+/* If we reached the max length, remove the older line. */
+if (history.size() == history_max_len) {
+    history.pop_front();
     }
-    history.push_back(line);
+    history.push_back(std::move(line));
 
     return true;
 }
@@ -2399,7 +2399,7 @@ inline bool LoadHistory(const char* path) {
     return true;
 }
 
-inline const std::vector<std::string>& GetHistory() {
+inline const std::deque<std::string>& GetHistory() {
     return history;
 }
 
